@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
+from app.schemas.health import RootResponse
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -26,6 +27,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
     )
+
+    @app.get("/", response_model=RootResponse, tags=["root"])
+    async def root() -> RootResponse:
+        return RootResponse(
+            app=app_settings.app_name,
+            status="ok",
+            docs_url="/docs",
+            health_url=f"{app_settings.api_v1_prefix}/healthz",
+        )
 
     app.include_router(api_v1_router, prefix=app_settings.api_v1_prefix)
 

@@ -1,3 +1,7 @@
+Запуск апи
+python -m uvicorn app.main:app --reload --app-dir backend
+
+
 Пользователь
   ↓
 https://psihologpashkov.ru
