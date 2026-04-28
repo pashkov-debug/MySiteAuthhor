@@ -17,6 +17,11 @@ def test_settings() -> Settings:
         jwt_algorithm="HS256",
         jwt_access_ttl_minutes=15,
         jwt_refresh_ttl_days=30,
+        auth_refresh_cookie_name="refresh_token",
+        auth_refresh_cookie_domain=None,
+        auth_refresh_cookie_path="/api/v1/auth",
+        auth_refresh_cookie_secure=False,
+        auth_refresh_cookie_samesite="lax",
         cache_default_ttl_seconds=300,
         enable_openapi=True,
     )

@@ -56,11 +56,14 @@ class LoginRequest(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    refresh_token: str = Field(min_length=1)
+    refresh_token: str | None = Field(default=None, min_length=1)
 
     @field_validator("refresh_token")
     @classmethod
-    def validate_refresh_token(cls, value: str) -> str:
+    def validate_refresh_token(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
         if not value.strip():
             raise ValueError("Refresh token must not be empty")
 
