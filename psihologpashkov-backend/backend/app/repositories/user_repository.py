@@ -58,3 +58,20 @@ class SQLAlchemyUserRepository:
         await self._session.refresh(user)
 
         return user
+
+    async def update_password_hash(
+        self,
+        user_id: UUID,
+        password_hash: str,
+    ) -> User | None:
+        user = await self.get_by_id(user_id)
+
+        if user is None:
+            return None
+
+        user.password_hash = password_hash
+
+        await self._session.commit()
+        await self._session.refresh(user)
+
+        return user

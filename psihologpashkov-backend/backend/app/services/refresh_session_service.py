@@ -50,6 +50,9 @@ class RefreshSessionRepository(Protocol):
     async def revoke_by_jti_hash(self, jti_hash: str) -> bool:
         pass
 
+    async def revoke_all_for_user(self, user_id: UUID) -> int:
+        pass
+
 
 def hash_jti(jti: str) -> str:
     if not jti:
