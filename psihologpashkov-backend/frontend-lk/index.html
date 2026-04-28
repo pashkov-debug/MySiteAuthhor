@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Личный кабинет</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <div class="header">
+        <div>
+          <h1>Личный кабинет</h1>
+          <p>Вход, профиль, пароль и аватар</p>
+        </div>
+        <button id="logoutButton" class="secondary hidden" type="button">Выйти</button>
+      </div>
+
+      <div id="message" class="message hidden"></div>
+
+      <section id="authSection" class="grid">
+        <form id="loginForm" class="panel">
+          <h2>Вход</h2>
+
+          <label>
+            Email
+            <input name="email" type="email" autocomplete="email" required>
+          </label>
+
+          <label>
+            Пароль
+            <input name="password" type="password" autocomplete="current-password" required>
+          </label>
+
+          <button type="submit">Войти</button>
+        </form>
+
+        <form id="registerForm" class="panel">
+          <h2>Регистрация</h2>
+
+          <label>
+            Email
+            <input name="email" type="email" autocomplete="email" required>
+          </label>
+
+          <label>
+            Имя
+            <input name="full_name" type="text" autocomplete="name">
+          </label>
+
+          <label>
+            Пароль
+            <input name="password" type="password" autocomplete="new-password" minlength="8" required>
+          </label>
+
+          <button type="submit">Создать аккаунт</button>
+        </form>
+      </section>
+
+      <section id="profileSection" class="hidden">
+        <div class="profile">
+          <img id="avatarImage" class="avatar hidden" alt="Аватар пользователя">
+          <div>
+            <h2 id="profileEmail">—</h2>
+            <p id="profileName">—</p>
+          </div>
+        </div>
+
+        <form id="profileForm" class="panel">
+          <h2>Профиль</h2>
+
+          <label>
+            Имя
+            <input name="full_name" type="text" autocomplete="name">
+          </label>
+
+          <button type="submit">Сохранить профиль</button>
+        </form>
+
+        <form id="passwordForm" class="panel">
+          <h2>Смена пароля</h2>
+
+          <label>
+            Текущий пароль
+            <input name="current_password" type="password" autocomplete="current-password" required>
+          </label>
+
+          <label>
+            Новый пароль
+            <input name="new_password" type="password" autocomplete="new-password" minlength="8" required>
+          </label>
+
+          <button type="submit">Сменить пароль</button>
+        </form>
+
+        <form id="avatarForm" class="panel">
+          <h2>Аватар</h2>
+
+          <label>
+            Файл
+            <input name="file" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
+          </label>
+
+          <div class="actions">
+            <button type="submit">Загрузить аватар</button>
+            <button id="deleteAvatarButton" class="secondary" type="button">Удалить аватар</button>
+          </div>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <script src="./assets/config.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
