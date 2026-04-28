@@ -4,6 +4,45 @@ ruff format backend
 ruff check backend
 pytest
 
+## Локальный запуск
+
+```bash
+cd psihologpashkov-backend
+source ../.venv/bin/activate
+
+make install
+make check
+make run
+
+http://127.0.0.1:8000/
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/api/v1/healthz
+
+Docker local stack
+make docker-up
+docker compose -f infra/compose.full.local.yml exec api alembic upgrade head
+curl -i http://127.0.0.1:8000/api/v1/healthz
+
+играции
+
+История:
+
+alembic history
+
+Создать миграцию:
+
+alembic revision --autogenerate -m "migration name"
+
+Применить:
+
+alembic upgrade head
+
+Откатить последнюю:
+
+alembic downgrade -1
+Проверки
+make format
+make check
 
 Запуск апи
 python -m uvicorn app.main:app --reload --app-dir backend
