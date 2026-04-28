@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     jwt_access_secret: str = "change-me-access-secret"
     jwt_refresh_secret: str = "change-me-refresh-secret"
+    jwt_algorithm: str = "HS256"
     jwt_access_ttl_minutes: int = 15
     jwt_refresh_ttl_days: int = 30
 
