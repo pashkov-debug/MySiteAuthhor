@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: psihologpashkov-postgres-full-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: psihologpashkov
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - psihologpashkov_postgres_full_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d psihologpashkov"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: psihologpashkov-api-local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: Psiholog Pashkov API
+      APP_ENV: local
+      API_V1_PREFIX: /api/v1
+
+      CORS_ORIGINS: http://127.0.0.1:8000,http://localhost:8000,https://psihologpashkov.ru,https://www.psihologpashkov.ru
+
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/psihologpashkov
+
+      JWT_ACCESS_SECRET: local-access-secret-32-bytes-minimum-value
+      JWT_REFRESH_SECRET: local-refresh-secret-32-bytes-minimum-value
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TTL_MINUTES: 15
+      JWT_REFRESH_TTL_DAYS: 30
+
+      AUTH_REFRESH_COOKIE_NAME: refresh_token
+      AUTH_REFRESH_COOKIE_DOMAIN:
+      AUTH_REFRESH_COOKIE_PATH: /api/v1/auth
+      AUTH_REFRESH_COOKIE_SECURE: "false"
+      AUTH_REFRESH_COOKIE_SAMESITE: lax
+
+      CACHE_DEFAULT_TTL_SECONDS: 300
+
+      UPLOADS_ROOT: backend/uploads
+      UPLOADS_PUBLIC_PATH: /uploads
+      AVATAR_UPLOAD_SUBDIR: avatars
+      AVATAR_MAX_SIZE_BYTES: 2097152
+      AVATAR_ALLOWED_EXTENSIONS: .jpg,.jpeg,.png,.webp
+
+      ENABLE_OPENAPI: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - psihologpashkov_uploads_full_data:/app/backend/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  psihologpashkov_postgres_full_data:
+  psihologpashkov_uploads_full_data:
