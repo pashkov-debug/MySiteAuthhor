@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
 
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
@@ -27,6 +30,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    )
+
+    uploads_root = Path(app_settings.uploads_root)
+    uploads_root.mkdir(parents=True, exist_ok=True)
+
+    app.mount(
+        app_settings.uploads_public_path,
+        StaticFiles(directory=uploads_root),
+        name="uploads",
     )
 
     @app.get("/", response_model=RootResponse, tags=["root"])

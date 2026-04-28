@@ -130,3 +130,13 @@ data/
 backups/
 uploads/
 media/
+
+# =========================
+# Backend uploaded files
+# =========================
+!psihologpashkov-backend/backend/uploads/
+psihologpashkov-backend/backend/uploads/*
+!psihologpashkov-backend/backend/uploads/.gitkeep
+!psihologpashkov-backend/backend/uploads/avatars/
+psihologpashkov-backend/backend/uploads/avatars/*
+!psihologpashkov-backend/backend/uploads/avatars/.gitkeep

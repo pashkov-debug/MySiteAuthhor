@@ -25,6 +25,7 @@ class UserForProfile(Protocol):
     id: UUID
     email: str
     full_name: str | None
+    avatar_path: str | None
     is_active: bool
     is_superuser: bool
 
@@ -51,6 +52,13 @@ class UserProfileRepository(Protocol):
     ) -> UserForPasswordChange | None:
         pass
 
+    async def update_avatar_path(
+        self,
+        user_id: UUID,
+        avatar_path: str | None,
+    ) -> UserForProfile | None:
+        pass
+
 
 class RefreshSessionRevocationRepository(Protocol):
     async def revoke_all_for_user(self, user_id: UUID) -> int:
@@ -65,6 +73,22 @@ async def update_current_user_profile(
     user = await user_repository.update_profile(
         user_id=user_id,
         full_name=data.full_name,
+    )
+
+    if user is None:
+        raise UserNotFoundError("User not found")
+
+    return user
+
+
+async def update_current_user_avatar(
+    user_id: UUID,
+    avatar_path: str | None,
+    user_repository: UserProfileRepository,
+) -> UserForProfile:
+    user = await user_repository.update_avatar_path(
+        user_id=user_id,
+        avatar_path=avatar_path,
     )
 
     if user is None:

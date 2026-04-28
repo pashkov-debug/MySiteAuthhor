@@ -8,6 +8,7 @@ class UserPublic(BaseModel):
     id: UUID
     email: str
     full_name: str | None
+    avatar_path: str | None = None
     is_active: bool
     is_superuser: bool
     created_at: datetime

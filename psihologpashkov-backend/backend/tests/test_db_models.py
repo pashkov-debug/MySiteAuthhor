@@ -24,3 +24,9 @@ def test_refresh_session_table_has_required_columns() -> None:
     table = Base.metadata.tables["refresh_sessions"]
 
     assert {"id", "user_id", "jti_hash", "expires_at", "revoked_at"}.issubset(table.columns.keys())
+
+
+def test_user_table_has_avatar_path_column() -> None:
+    table = Base.metadata.tables["users"]
+
+    assert "avatar_path" in table.columns

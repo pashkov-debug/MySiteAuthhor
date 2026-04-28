@@ -75,3 +75,20 @@ class SQLAlchemyUserRepository:
         await self._session.refresh(user)
 
         return user
+
+    async def update_avatar_path(
+        self,
+        user_id: UUID,
+        avatar_path: str | None,
+    ) -> User | None:
+        user = await self.get_by_id(user_id)
+
+        if user is None:
+            return None
+
+        user.avatar_path = avatar_path
+
+        await self._session.commit()
+        await self._session.refresh(user)
+
+        return user
