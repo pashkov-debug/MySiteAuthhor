@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,3 +57,16 @@ class SQLAlchemyRefreshSessionRepository:
             await self._session.refresh(refresh_session)
 
         return True
+
+    async def revoke_all_for_user(self, user_id: UUID) -> int:
+        result = await self._session.execute(
+            update(RefreshSession)
+            .where(
+                RefreshSession.user_id == user_id,
+                RefreshSession.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(UTC))
+        )
+        await self._session.commit()
+
+        return result.rowcount or 0
