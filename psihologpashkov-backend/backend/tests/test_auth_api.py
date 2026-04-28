@@ -61,6 +61,21 @@ class FakeUserRepository:
 
         return user
 
+    async def update_profile(
+        self,
+        user_id: UUID,
+        full_name: str | None,
+    ) -> FakeUser | None:
+        user = self.users_by_id.get(user_id)
+
+        if user is None:
+            return None
+
+        user.full_name = full_name
+        user.updated_at = datetime.now(UTC)
+
+        return user
+
 
 @dataclass(slots=True)
 class FakeRefreshSessionRepository:
@@ -118,6 +133,25 @@ def make_auth_client(
     app.dependency_overrides[get_refresh_session_repository] = override_refresh_session_repository
 
     return TestClient(app), user_repository, refresh_session_repository
+
+
+def register_and_login(client: TestClient) -> str:
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "user@example.com",
+            "password": "strong-password",
+        },
+    )
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "user@example.com",
+            "password": "strong-password",
+        },
+    )
+
+    return login_response.json()["access_token"]
 
 
 def test_register_creates_user(test_settings: Settings) -> None:
@@ -213,22 +247,7 @@ def test_me_requires_authentication(test_settings: Settings) -> None:
 
 def test_me_returns_current_user(test_settings: Settings) -> None:
     client, _, _ = make_auth_client(test_settings)
-
-    client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "user@example.com",
-            "password": "strong-password",
-        },
-    )
-    login_response = client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": "user@example.com",
-            "password": "strong-password",
-        },
-    )
-    access_token = login_response.json()["access_token"]
+    access_token = register_and_login(client)
 
     response = client.get(
         "/api/v1/me",
@@ -237,6 +256,46 @@ def test_me_returns_current_user(test_settings: Settings) -> None:
 
     assert response.status_code == 200
     assert response.json()["email"] == "user@example.com"
+
+
+def test_update_me_requires_authentication(test_settings: Settings) -> None:
+    client, _, _ = make_auth_client(test_settings)
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"full_name": "Алексей"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_update_me_updates_current_user_profile(test_settings: Settings) -> None:
+    client, _, _ = make_auth_client(test_settings)
+    access_token = register_and_login(client)
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"full_name": "  Алексей Пашков  "},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "user@example.com"
+    assert response.json()["full_name"] == "Алексей Пашков"
+
+
+def test_update_me_can_clear_full_name(test_settings: Settings) -> None:
+    client, _, _ = make_auth_client(test_settings)
+    access_token = register_and_login(client)
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"full_name": "    "},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["full_name"] is None
 
 
 def test_me_rejects_inactive_user(test_settings: Settings) -> None:

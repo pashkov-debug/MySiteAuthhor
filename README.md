@@ -1,3 +1,10 @@
+Раф
+ruff check backend --fix
+ruff format backend
+ruff check backend
+pytest
+
+
 Запуск апи
 python -m uvicorn app.main:app --reload --app-dir backend
 

@@ -41,3 +41,20 @@ class SQLAlchemyUserRepository:
         await self._session.refresh(user)
 
         return user
+
+    async def update_profile(
+        self,
+        user_id: UUID,
+        full_name: str | None,
+    ) -> User | None:
+        user = await self.get_by_id(user_id)
+
+        if user is None:
+            return None
+
+        user.full_name = full_name
+
+        await self._session.commit()
+        await self._session.refresh(user)
+
+        return user
