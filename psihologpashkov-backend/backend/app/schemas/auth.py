@@ -55,11 +55,27 @@ class LoginRequest(BaseModel):
         return value
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+    @field_validator("refresh_token")
+    @classmethod
+    def validate_refresh_token(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Refresh token must not be empty")
+
+        return value
+
+
 class TokenPairResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
+
+
+class LogoutResponse(BaseModel):
+    status: Literal["ok"] = "ok"
 
 
 def normalize_email(value: str) -> str:
