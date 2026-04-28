@@ -76,6 +76,37 @@ def build_avatar_object_name(
     return f"{user_id}/{uuid4().hex}{suffix}"
 
 
+def build_avatar_public_path(
+    object_name: str,
+    settings: Settings | None = None,
+) -> str:
+    app_settings = settings or get_settings()
+
+    return (
+        f"{app_settings.uploads_public_path.rstrip('/')}/"
+        f"{app_settings.avatar_upload_subdir.strip('/')}/"
+        f"{object_name}"
+    )
+
+
+def extract_avatar_object_name_from_public_path(
+    avatar_path: str,
+    settings: Settings | None = None,
+) -> str | None:
+    app_settings = settings or get_settings()
+    expected_prefix = (
+        f"{app_settings.uploads_public_path.rstrip('/')}/"
+        f"{app_settings.avatar_upload_subdir.strip('/')}/"
+    )
+
+    if not avatar_path.startswith(expected_prefix):
+        return None
+
+    object_name = avatar_path.removeprefix(expected_prefix)
+
+    return object_name or None
+
+
 def resolve_avatar_path(
     object_name: str,
     settings: Settings | None = None,
@@ -89,3 +120,45 @@ def resolve_avatar_path(
         raise InvalidStoragePathError("Avatar object path is invalid")
 
     return get_avatar_storage_dir(settings) / object_path
+
+
+def save_avatar_content(
+    user_id: UUID,
+    original_filename: str,
+    content: bytes,
+    settings: Settings | None = None,
+) -> str:
+    validate_avatar_size(len(content), settings)
+
+    object_name = build_avatar_object_name(
+        user_id=user_id,
+        original_filename=original_filename,
+        settings=settings,
+    )
+    file_path = resolve_avatar_path(object_name, settings)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_bytes(content)
+
+    return build_avatar_public_path(object_name, settings)
+
+
+def delete_avatar_by_public_path(
+    avatar_path: str | None,
+    settings: Settings | None = None,
+) -> bool:
+    if not avatar_path:
+        return False
+
+    object_name = extract_avatar_object_name_from_public_path(avatar_path, settings)
+
+    if object_name is None:
+        return False
+
+    file_path = resolve_avatar_path(object_name, settings)
+
+    if not file_path.is_file():
+        return False
+
+    file_path.unlink()
+
+    return True
