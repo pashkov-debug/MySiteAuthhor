@@ -19,6 +19,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=redoc_url,
         openapi_url=openapi_url,
     )
+    app.state.settings = app_settings
 
     app.add_middleware(
         CORSMiddleware,

@@ -32,6 +32,9 @@ class UserForAuth(Protocol):
 
 
 class UserRepository(Protocol):
+    async def get_by_id(self, user_id: UUID) -> UserForAuth | None:
+        pass
+
     async def get_by_email(self, email: str) -> UserForAuth | None:
         pass
 
