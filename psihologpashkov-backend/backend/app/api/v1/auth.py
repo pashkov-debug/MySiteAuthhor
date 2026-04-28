@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_app_settings, get_refresh_session_repository, get_user_repository
 from app.core.config import Settings
+from app.core.cookies import clear_refresh_token_cookie, set_refresh_token_cookie
 from app.schemas.auth import (
     LoginRequest,
     LogoutResponse,
@@ -56,6 +57,7 @@ async def register(
 async def login(
     data: LoginRequest,
     request: Request,
+    response: Response,
     user_repository: Annotated[UserRepository, Depends(get_user_repository)],
     refresh_session_repository: Annotated[
         RefreshSessionRepository,
@@ -86,6 +88,12 @@ async def login(
         ip_address=request.client.host if request.client else None,
     )
 
+    set_refresh_token_cookie(
+        response=response,
+        refresh_token=token_pair.refresh_token,
+        settings=settings,
+    )
+
     return TokenPairResponse(
         access_token=token_pair.access_token,
         refresh_token=token_pair.refresh_token,
@@ -96,18 +104,27 @@ async def login(
 
 @router.post("/refresh", response_model=TokenPairResponse)
 async def refresh(
-    data: RefreshTokenRequest,
     request: Request,
+    response: Response,
     user_repository: Annotated[UserRepository, Depends(get_user_repository)],
     refresh_session_repository: Annotated[
         RefreshSessionRepository,
         Depends(get_refresh_session_repository),
     ],
     settings: Annotated[Settings, Depends(get_app_settings)],
+    data: Annotated[RefreshTokenRequest | None, Body()] = None,
 ) -> TokenPairResponse:
+    refresh_token = get_refresh_token_from_request(data, request, settings)
+
+    if refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
     try:
         token_pair = await refresh_token_pair(
-            refresh_token=data.refresh_token,
+            refresh_token=refresh_token,
             user_repository=user_repository,
             refresh_session_repository=refresh_session_repository,
             settings=settings,
@@ -125,6 +142,12 @@ async def refresh(
             detail="User is inactive",
         ) from exc
 
+    set_refresh_token_cookie(
+        response=response,
+        refresh_token=token_pair.refresh_token,
+        settings=settings,
+    )
+
     return TokenPairResponse(
         access_token=token_pair.access_token,
         refresh_token=token_pair.refresh_token,
@@ -135,17 +158,40 @@ async def refresh(
 
 @router.post("/logout", response_model=LogoutResponse)
 async def logout(
-    data: RefreshTokenRequest,
+    request: Request,
+    response: Response,
     refresh_session_repository: Annotated[
         RefreshSessionRepository,
         Depends(get_refresh_session_repository),
     ],
     settings: Annotated[Settings, Depends(get_app_settings)],
+    data: Annotated[RefreshTokenRequest | None, Body()] = None,
 ) -> LogoutResponse:
-    await logout_refresh_token(
-        refresh_token=data.refresh_token,
-        refresh_session_repository=refresh_session_repository,
-        settings=settings,
-    )
+    refresh_token = get_refresh_token_from_request(data, request, settings)
+
+    if refresh_token is not None:
+        await logout_refresh_token(
+            refresh_token=refresh_token,
+            refresh_session_repository=refresh_session_repository,
+            settings=settings,
+        )
+
+    clear_refresh_token_cookie(response=response, settings=settings)
 
     return LogoutResponse()
+
+
+def get_refresh_token_from_request(
+    data: RefreshTokenRequest | None,
+    request: Request,
+    settings: Settings,
+) -> str | None:
+    if data is not None and data.refresh_token:
+        return data.refresh_token
+
+    cookie_token = request.cookies.get(settings.auth_refresh_cookie_name)
+
+    if cookie_token and cookie_token.strip():
+        return cookie_token
+
+    return None

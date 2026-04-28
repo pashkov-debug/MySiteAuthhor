@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     jwt_access_ttl_minutes: int = 15
     jwt_refresh_ttl_days: int = 30
 
+    auth_refresh_cookie_name: str = "refresh_token"
+    auth_refresh_cookie_domain: str | None = None
+    auth_refresh_cookie_path: str = "/api/v1/auth"
+    auth_refresh_cookie_secure: bool = True
+    auth_refresh_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+
     cache_default_ttl_seconds: int = 300
 
     enable_openapi: bool = True
@@ -31,21 +37,35 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @field_validator("api_v1_prefix")
+    @field_validator("api_v1_prefix", "auth_refresh_cookie_path")
     @classmethod
-    def validate_api_prefix(cls, value: str) -> str:
+    def validate_url_prefix(cls, value: str) -> str:
         if not value.startswith("/"):
-            raise ValueError("API prefix must start with '/'")
-        if value.endswith("/"):
-            raise ValueError("API prefix must not end with '/'")
+            raise ValueError("URL prefix must start with '/'")
+        if value != "/" and value.endswith("/"):
+            raise ValueError("URL prefix must not end with '/'")
         return value
 
-    @field_validator("jwt_access_ttl_minutes", "jwt_refresh_ttl_days", "cache_default_ttl_seconds")
+    @field_validator(
+        "jwt_access_ttl_minutes",
+        "jwt_refresh_ttl_days",
+        "cache_default_ttl_seconds",
+    )
     @classmethod
     def validate_positive_int(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("Value must be positive")
         return value
+
+    @field_validator("auth_refresh_cookie_domain", mode="before")
+    @classmethod
+    def normalize_cookie_domain(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = str(value).strip()
+
+        return normalized or None
 
     @property
     def cors_origins_list(self) -> list[str]:
