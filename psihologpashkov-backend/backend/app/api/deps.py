@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.jwt import ExpiredTokenError, InvalidTokenError, decode_token
 from app.db.session import get_db_session
+from app.repositories.refresh_session_repository import SQLAlchemyRefreshSessionRepository
 from app.repositories.user_repository import SQLAlchemyUserRepository
 from app.services.auth_service import UserForAuth, UserRepository
+from app.services.refresh_session_service import RefreshSessionRepository
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -22,6 +24,12 @@ async def get_user_repository(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> UserRepository:
     return SQLAlchemyUserRepository(session)
+
+
+async def get_refresh_session_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> RefreshSessionRepository:
+    return SQLAlchemyRefreshSessionRepository(session)
 
 
 async def get_current_user(
