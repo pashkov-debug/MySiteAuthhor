@@ -6,6 +6,60 @@ pytest
 
 ## Локальный запуск
 
+Быстрый безопасный сброс локального окружения
+
+Локальные данные удалятся, но это dev-среда:
+
+cd ~/PycharmProjects/MySiteAuthhor/psihologpashkov-backend
+
+docker compose -f infra/compose.full.local.yml down -v --remove-orphans
+docker rm -f psihologpashkov-postgres-full-local psihologpashkov-api-local 2>/dev/null || true
+docker volume prune -f
+
+docker compose -f infra/compose.full.local.yml up -d postgres
+docker compose -f infra/compose.full.local.yml logs -f postgres
+
+Когда в логах будет что-то вроде:
+
+database system is ready to accept connections
+
+останови просмотр Ctrl+C и запусти API:
+
+docker compose -f infra/compose.full.local.yml up -d api
+docker compose -f infra/compose.full.local.yml exec api alembic upgrade head
+curl -i http://127.0.0.1:8000/api/v1/healthz
+Если Postgres всё равно unhealthy
+
+Проверь, не занят ли порт 5432 локальным Postgres:
+
+sudo ss -ltnp | grep ':5432'
+
+Если занят, в файле:
+
+infra/compose.full.local.yml
+
+замени у postgres:
+
+ports:
+  - "5432:5432"
+
+на:
+
+ports:
+  - "5433:5432"
+
+Внутри Docker-сети API всё равно ходит на:
+
+postgres:5432
+
+поэтому DATABASE_URL менять не надо.
+
+Потом:
+
+docker compose -f infra/compose.full.local.yml down -v --remove-orphans
+docker compose -f infra/compose.full.local.yml up -d --build
+docker compose -f infra/compose.full.local.yml exec api alembic upgrade head
+
 ```bash
 cd psihologpashkov-backend
 source ../.venv/bin/activate

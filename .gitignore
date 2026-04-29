@@ -130,6 +130,7 @@ data/
 backups/
 uploads/
 media/
+.env.prod.example
 
 # =========================
 # Backend uploaded files
