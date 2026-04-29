@@ -39,3 +39,21 @@ migrate:
 
 smoke-local:
 	./infra/scripts/smoke_api_local.sh
+
+prod-up:
+	bash ./infra/scripts/prod_up.sh
+
+prod-down:
+	bash ./infra/scripts/prod_down.sh
+
+prod-logs:
+	bash ./infra/scripts/prod_logs.sh
+
+backup-postgres:
+	bash ./infra/scripts/backup_postgres.sh
+
+backup-uploads:
+	bash ./infra/scripts/backup_uploads.sh
+
+smoke-prod:
+	bash ./infra/scripts/smoke_api_prod.sh

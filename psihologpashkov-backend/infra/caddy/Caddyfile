@@ -1,0 +1,19 @@
+{$API_DOMAIN} {
+    encode gzip zstd
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    @uploads path /uploads/*
+    handle @uploads {
+        root * /app/backend
+        file_server
+    }
+
+    handle {
+        reverse_proxy api:8000
+    }
+}
