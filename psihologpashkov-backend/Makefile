@@ -1,4 +1,4 @@
-.PHONY: install lint format test check run docker-build docker-up docker-down docker-logs migrate
+.PHONY: install lint format test check run docker-build docker-up docker-down docker-logs migrate smoke-local
 
 install:
 	python -m pip install --upgrade pip
@@ -36,3 +36,6 @@ docker-logs:
 
 migrate:
 	alembic upgrade head
+
+smoke-local:
+	./infra/scripts/smoke_api_local.sh
