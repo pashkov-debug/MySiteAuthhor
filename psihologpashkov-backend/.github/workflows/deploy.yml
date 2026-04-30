@@ -2,31 +2,123 @@ name: Deploy backend
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - "psihologpashkov-backend/**"
+      - ".github/workflows/deploy.yml"
 
 jobs:
   deploy:
-    name: Deploy to VM
+    name: Deploy backend to VM
     runs-on: ubuntu-latest
 
+    env:
+      APP_DIR: /opt/MySiteAuthhor
+      DEPLOY_TMP_DIR: /tmp/psihologpashkov-deploy
+
     steps:
-      - name: Deploy over SSH
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        working-directory: psihologpashkov-backend
+        run: |
+          docker build -t psihologpashkov-api:prod .
+
+      - name: Prepare deploy bundle
+        run: |
+          mkdir -p /tmp/psihologpashkov-deploy
+
+          tar \
+            --exclude=".git" \
+            --exclude=".venv" \
+            --exclude="**/__pycache__" \
+            --exclude="**/.pytest_cache" \
+            --exclude="**/.ruff_cache" \
+            --exclude="psihologpashkov-backend/.env" \
+            --exclude="psihologpashkov-backend/.env.prod" \
+            -czf /tmp/psihologpashkov-deploy/app.tar.gz \
+            .
+
+          docker save psihologpashkov-api:prod \
+            | gzip > /tmp/psihologpashkov-deploy/api-image.tar.gz
+
+          ls -lh /tmp/psihologpashkov-deploy
+
+      - name: Upload bundle to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: "/tmp/psihologpashkov-deploy/app.tar.gz,/tmp/psihologpashkov-deploy/api-image.tar.gz"
+          target: "/tmp/psihologpashkov-deploy"
+          strip_components: 2
+          overwrite: true
+
+      - name: Deploy on VM
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          port: ${{ secrets.DEPLOY_PORT }}
           script: |
             set -euo pipefail
 
-            APP_DIR="${{ secrets.DEPLOY_APP_DIR }}"
-            APP_BRANCH="${{ secrets.DEPLOY_BRANCH }}"
+            APP_DIR="/opt/MySiteAuthhor"
+            DEPLOY_TMP_DIR="/tmp/psihologpashkov-deploy"
+            EXTRACT_DIR="${DEPLOY_TMP_DIR}/extract"
 
-            cd "$APP_DIR"
+            echo "[deploy] checking required files"
+            test -f "${DEPLOY_TMP_DIR}/app.tar.gz"
+            test -f "${DEPLOY_TMP_DIR}/api-image.tar.gz"
 
-            git fetch origin "$APP_BRANCH"
-            git reset --hard "origin/$APP_BRANCH"
+            echo "[deploy] loading API image"
+            gunzip -c "${DEPLOY_TMP_DIR}/api-image.tar.gz" | docker load
 
-            cd psihologpashkov-backend
+            echo "[deploy] extracting project"
+            rm -rf "${EXTRACT_DIR}"
+            mkdir -p "${EXTRACT_DIR}"
+            tar -xzf "${DEPLOY_TMP_DIR}/app.tar.gz" -C "${EXTRACT_DIR}"
 
-            bash infra/scripts/deploy_on_vm.sh
+            echo "[deploy] syncing project to ${APP_DIR}"
+            mkdir -p "${APP_DIR}"
+
+            rsync -a --delete \
+              --exclude "psihologpashkov-backend/.env" \
+              --exclude "psihologpashkov-backend/.env.prod" \
+              "${EXTRACT_DIR}/" \
+              "${APP_DIR}/"
+
+            cd "${APP_DIR}/psihologpashkov-backend"
+
+            echo "[deploy] checking production secrets"
+            test -f ".env.prod"
+            test -f "/opt/psihologpashkov-certs/fullchain.pem"
+            test -f "/opt/psihologpashkov-certs/privkey.pem"
+
+            echo "[deploy] starting containers"
+            docker compose --env-file .env.prod -f infra/compose.prod.yml up -d --no-build
+
+            echo "[deploy] applying migrations"
+            docker compose --env-file .env.prod -f infra/compose.prod.yml exec -T api alembic upgrade head
+
+            echo "[deploy] checking API health"
+            for i in $(seq 1 30); do
+              if docker compose --env-file .env.prod -f infra/compose.prod.yml exec -T api curl -fsS http://127.0.0.1:8000/api/v1/healthz >/dev/null; then
+                echo "[deploy] API health OK"
+                docker compose --env-file .env.prod -f infra/compose.prod.yml ps
+                exit 0
+              fi
+
+              echo "[deploy] API not ready yet: ${i}/30"
+              sleep 2
+            done
+
+            echo "[deploy] API health failed"
+            docker compose --env-file .env.prod -f infra/compose.prod.yml logs --tail=100 api
+            exit 1
