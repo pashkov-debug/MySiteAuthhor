@@ -131,6 +131,7 @@ backups/
 uploads/
 media/
 .env.prod.example
+!.env.prod.example
 
 # =========================
 # Backend uploaded files
