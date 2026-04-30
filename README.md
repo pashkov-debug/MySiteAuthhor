@@ -4,7 +4,12 @@ ruff format backend
 ruff check backend
 pytest
 
+
+
+
 ## Локальный запуск
+
+ssh -i /home/alex/Downloads/id_rsa user1@89.232.176.127
 
 Быстрый безопасный сброс локального окружения
 

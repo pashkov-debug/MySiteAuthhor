@@ -1,4 +1,4 @@
-.PHONY: install lint format test check run docker-build docker-up docker-down docker-logs migrate smoke-local
+.PHONY: install lint format test check run docker-build docker-up docker-down docker-logs migrate smoke-local prod-up prod-down prod-logs backup-postgres backup-uploads smoke-prod deploy-local-check
 
 install:
 	python -m pip install --upgrade pip
@@ -57,3 +57,6 @@ backup-uploads:
 
 smoke-prod:
 	bash ./infra/scripts/smoke_api_prod.sh
+
+deploy-local-check:
+	bash ./infra/scripts/deploy_on_vm.sh
