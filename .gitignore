@@ -144,3 +144,6 @@ psihologpashkov-backend/backend/uploads/avatars/*
 !psihologpashkov-backend/backend/uploads/avatars/.gitkeep
 # Production/local backups
 psihologpashkov-backend/backups/
+
+# Local project handoff notes with private operational details
+psihologpashkov-backend/PROJECT_HANDOFF.md

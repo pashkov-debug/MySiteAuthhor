@@ -1,3 +1,32 @@
+✅ FastAPI backend
+✅ Postgres
+✅ JWT access/refresh
+✅ HttpOnly refresh cookie
+✅ личный кабинет
+✅ аватарки
+✅ HTTPS API
+✅ автодеплой GitHub → VM
+✅ cron backup на VM
+
+следующий этап
+1. Добавить role/status в User
+2. Добавить миграцию
+3. Расширить UserPublic
+4. Добавить backend dependency:
+   require_active_user
+   require_admin
+   require_role(...)
+5. Добавить тесты прав доступа
+6. Потом уже делать закрытые страницы во frontend-lk
+
+Пример будущих правил:
+
+/                 публичный сайт
+/lk/              любой авторизованный пользователь
+/lk/materials/    только role=client или admin
+/lk/admin/        только admin
+/api/v1/admin/*   только admin
+
 Раф
 ruff check backend --fix
 ruff format backend
