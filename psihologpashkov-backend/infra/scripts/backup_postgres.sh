@@ -8,7 +8,7 @@ if [[ ! -f ".env.prod" ]]; then
   exit 1
 fi
 
-BACKUP_DIR="${BACKUP_DIR:-./backups/postgres}"
+BACKUP_DIR="${BACKUP_DIR:-/opt/psihologpashkov-backups/postgres}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_FILE="${BACKUP_DIR}/psihologpashkov-${TIMESTAMP}.dump"
 

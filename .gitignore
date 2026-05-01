@@ -142,3 +142,5 @@ psihologpashkov-backend/backend/uploads/*
 !psihologpashkov-backend/backend/uploads/avatars/
 psihologpashkov-backend/backend/uploads/avatars/*
 !psihologpashkov-backend/backend/uploads/avatars/.gitkeep
+# Production/local backups
+psihologpashkov-backend/backups/
