@@ -9,6 +9,12 @@
         Referrer-Policy strict-origin-when-cross-origin
     }
 
+    handle_path /lk* {
+        root * /srv/lk
+        try_files {path} /index.html
+        file_server
+    }
+
     @uploads path /uploads/*
     handle @uploads {
         root * /app/backend
