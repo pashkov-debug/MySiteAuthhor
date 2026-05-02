@@ -1,5 +1,11 @@
 # Psiholog Pashkov Backend — handoff / продолжение работы
 
+после деплоя на вм
+
+cd /opt/MySiteAuthhor/psihologpashkov-backend
+
+docker compose --env-file .env.prod -f infra/compose.prod.yml up -d --force-recreate api
+
 Дата фиксации состояния: 2026-05-01
 
 Этот файл нужен, чтобы в новой сессии быстро продолжить работу над проектом без восстановления контекста из переписки.

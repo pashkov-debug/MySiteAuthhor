@@ -137,23 +137,33 @@ async def resend_verification_email(
     return EmailVerificationResponse()
 
 
-@router.get("/verify-email", response_model=EmailVerificationResponse)
+@router.get("/verify-email", response_model=TokenPairResponse)
 async def verify_email(
     token: Annotated[str, Query(min_length=1)],
+    request: Request,
+    response: Response,
     user_repository: Annotated[UserRepository, Depends(get_user_repository)],
     verification_token_repository: Annotated[
         EmailVerificationTokenRepository,
         Depends(get_email_verification_token_repository),
     ],
-) -> EmailVerificationResponse:
+    refresh_session_repository: Annotated[
+        RefreshSessionRepository,
+        Depends(get_refresh_session_repository),
+    ],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> TokenPairResponse:
     try:
-        await verify_email_by_token(
+        user = await verify_email_by_token(
             raw_token=token,
             token_repository=verification_token_repository,
             user_repository=user_repository,
         )
-    except EmailAlreadyVerifiedError:
-        return EmailVerificationResponse()
+    except EmailAlreadyVerifiedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already verified",
+        ) from exc
     except ExpiredEmailVerificationTokenError as exc:
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
@@ -165,7 +175,28 @@ async def verify_email(
             detail="Invalid email verification token",
         ) from exc
 
-    return EmailVerificationResponse()
+    token_pair = create_token_pair(user.id, settings)
+
+    await store_refresh_token(
+        refresh_token=token_pair.refresh_token,
+        refresh_session_repository=refresh_session_repository,
+        settings=settings,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    set_refresh_token_cookie(
+        response=response,
+        refresh_token=token_pair.refresh_token,
+        settings=settings,
+    )
+
+    return TokenPairResponse(
+        access_token=token_pair.access_token,
+        refresh_token=token_pair.refresh_token,
+        token_type="bearer",
+        expires_in=token_pair.expires_in,
+    )
 
 
 @router.post("/login", response_model=TokenPairResponse)
