@@ -56,10 +56,5 @@ services:
       - psihologpashkov_caddy_prod_data:/data
       - psihologpashkov_caddy_prod_config:/config
       - psihologpashkov_uploads_prod_data:/app/backend/uploads:ro
+      - /var/www/psihologpashkov.ru/lk:/srv/lk:ro
       - /opt/psihologpashkov-certs:/etc/caddy/certs:ro
-
-volumes:
-  psihologpashkov_postgres_prod_data:
-  psihologpashkov_uploads_prod_data:
-  psihologpashkov_caddy_prod_data:
-  psihologpashkov_caddy_prod_config:
