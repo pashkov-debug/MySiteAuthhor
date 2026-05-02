@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,11 +26,13 @@ class SQLAlchemyUserRepository:
         email: str,
         password_hash: str,
         full_name: str | None,
+        is_active: bool = True,
     ) -> User:
         user = User(
             email=email,
             password_hash=password_hash,
             full_name=full_name,
+            is_active=is_active,
         )
         self._session.add(user)
 
@@ -53,6 +57,24 @@ class SQLAlchemyUserRepository:
             return None
 
         user.full_name = full_name
+
+        await self._session.commit()
+        await self._session.refresh(user)
+
+        return user
+
+    async def mark_email_verified(
+        self,
+        user_id: UUID,
+        verified_at: datetime | None = None,
+    ) -> User | None:
+        user = await self.get_by_id(user_id)
+
+        if user is None:
+            return None
+
+        user.email_verified_at = verified_at or datetime.now(UTC)
+        user.is_active = True
 
         await self._session.commit()
         await self._session.refresh(user)

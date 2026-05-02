@@ -1,9 +1,16 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
-from app.api.deps import get_refresh_session_repository, get_user_repository
+from app.api.deps import (
+    get_email_sender,
+    get_email_verification_token_repository,
+    get_refresh_session_repository,
+    get_user_repository,
+)
 from app.core.config import Settings
+from app.core.email import OutgoingEmail
 from app.main import create_app
 from fastapi.testclient import TestClient
 
@@ -16,6 +23,7 @@ class FakeUser:
     full_name: str | None
     is_active: bool = True
     is_superuser: bool = False
+    email_verified_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -48,15 +56,34 @@ class FakeUserRepository:
         email: str,
         password_hash: str,
         full_name: str | None,
+        is_active: bool = True,
     ) -> FakeUser:
         user = FakeUser(
             id=uuid4(),
             email=email,
             password_hash=password_hash,
             full_name=full_name,
+            is_active=is_active,
         )
         self.users_by_id[user.id] = user
         self.users_by_email[email] = user
+
+        return user
+
+
+    async def mark_email_verified(
+        self,
+        user_id: UUID,
+        verified_at: datetime | None = None,
+    ) -> FakeUser | None:
+        user = self.users_by_id.get(user_id)
+
+        if user is None:
+            return None
+
+        user.email_verified_at = verified_at or datetime.now(UTC)
+        user.is_active = True
+        user.updated_at = datetime.now(UTC)
 
         return user
 
@@ -110,12 +137,95 @@ class FakeRefreshSessionRepository:
         return revoked_count
 
 
+
+
+@dataclass(slots=True)
+class FakeEmailVerificationToken:
+    id: UUID
+    user_id: UUID
+    token_hash: str
+    expires_at: datetime
+    used_at: datetime | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
+@dataclass(slots=True)
+class FakeEmailVerificationTokenRepository:
+    tokens_by_hash: dict[str, FakeEmailVerificationToken] = field(default_factory=dict)
+
+    async def create_token(
+        self,
+        user_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> FakeEmailVerificationToken:
+        token = FakeEmailVerificationToken(
+            id=uuid4(),
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self.tokens_by_hash[token_hash] = token
+
+        return token
+
+    async def get_by_token_hash(self, token_hash: str) -> FakeEmailVerificationToken | None:
+        return self.tokens_by_hash.get(token_hash)
+
+    async def mark_used(self, token_id: UUID, used_at: datetime | None = None) -> bool:
+        for token in self.tokens_by_hash.values():
+            if token.id == token_id:
+                token.used_at = used_at or datetime.now(UTC)
+                return True
+
+        return False
+
+    async def mark_unused_for_user_used(
+        self,
+        user_id: UUID,
+        used_at: datetime | None = None,
+    ) -> int:
+        marked_count = 0
+
+        for token in self.tokens_by_hash.values():
+            if token.user_id == user_id and token.used_at is None:
+                token.used_at = used_at or datetime.now(UTC)
+                marked_count += 1
+
+        return marked_count
+
+
+@dataclass(slots=True)
+class CapturingEmailSender:
+    messages: list[OutgoingEmail] = field(default_factory=list)
+
+    async def send(self, message: OutgoingEmail) -> None:
+        self.messages.append(message)
+
+
+def get_last_email_token(client: TestClient) -> str:
+    email_sender = client.email_sender
+    message = email_sender.messages[-1]
+    link = message.text_body.split("http", 1)[1].split("\n", 1)[0]
+    parsed = urlsplit(f"http{link}")
+
+    return parse_qs(parsed.query)["token"][0]
+
+
+def verify_registered_email(client: TestClient) -> None:
+    token = get_last_email_token(client)
+    response = client.get(f"/api/v1/auth/verify-email?token={token}")
+
+    assert response.status_code == 200
+
 def make_cookie_client(
     test_settings: Settings,
 ) -> tuple[TestClient, FakeUserRepository, FakeRefreshSessionRepository]:
     app = create_app(test_settings)
     user_repository = FakeUserRepository()
     refresh_session_repository = FakeRefreshSessionRepository()
+    verification_token_repository = FakeEmailVerificationTokenRepository()
+    email_sender = CapturingEmailSender()
 
     async def override_user_repository() -> FakeUserRepository:
         return user_repository
@@ -123,10 +233,23 @@ def make_cookie_client(
     async def override_refresh_session_repository() -> FakeRefreshSessionRepository:
         return refresh_session_repository
 
+    async def override_email_verification_token_repository() -> FakeEmailVerificationTokenRepository:
+        return verification_token_repository
+
+    def override_email_sender() -> CapturingEmailSender:
+        return email_sender
+
     app.dependency_overrides[get_user_repository] = override_user_repository
     app.dependency_overrides[get_refresh_session_repository] = override_refresh_session_repository
+    app.dependency_overrides[get_email_verification_token_repository] = (
+        override_email_verification_token_repository
+    )
+    app.dependency_overrides[get_email_sender] = override_email_sender
 
-    return TestClient(app), user_repository, refresh_session_repository
+    client = TestClient(app)
+    client.email_sender = email_sender
+
+    return client, user_repository, refresh_session_repository
 
 
 def register_user(client: TestClient) -> None:
@@ -139,6 +262,7 @@ def register_user(client: TestClient) -> None:
     )
 
     assert response.status_code == 201
+    verify_registered_email(client)
 
 
 def login_user(client: TestClient) -> dict[str, object]:

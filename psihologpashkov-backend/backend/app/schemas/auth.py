@@ -37,6 +37,25 @@ class RegisterRequest(BaseModel):
         return normalized or None
 
 
+class RegisterResponse(BaseModel):
+    status: Literal["email_verification_required"] = "email_verification_required"
+    email: str
+    full_name: str | None = None
+
+
+class EmailVerificationResendRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_email(value)
+
+
+class EmailVerificationResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+
+
 class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=1, max_length=128)

@@ -30,3 +30,22 @@ def test_user_table_has_avatar_path_column() -> None:
     table = Base.metadata.tables["users"]
 
     assert "avatar_path" in table.columns
+
+
+def test_user_table_has_email_verified_at_column() -> None:
+    table = Base.metadata.tables["users"]
+
+    assert "email_verified_at" in table.columns
+
+
+def test_email_verification_token_model_registered_in_metadata() -> None:
+    assert models.EmailVerificationToken.__tablename__ == "email_verification_tokens"
+    assert "email_verification_tokens" in Base.metadata.tables
+
+
+def test_email_verification_token_table_has_required_columns() -> None:
+    table = Base.metadata.tables["email_verification_tokens"]
+
+    assert {"id", "user_id", "token_hash", "expires_at", "used_at"}.issubset(
+        table.columns.keys()
+    )

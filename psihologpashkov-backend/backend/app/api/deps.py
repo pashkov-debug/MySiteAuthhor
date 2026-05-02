@@ -6,11 +6,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.email import EmailSender, build_email_sender
 from app.core.jwt import ExpiredTokenError, InvalidTokenError, decode_token
 from app.db.session import get_db_session
+from app.repositories.email_verification_token_repository import SQLAlchemyEmailVerificationTokenRepository
 from app.repositories.refresh_session_repository import SQLAlchemyRefreshSessionRepository
 from app.repositories.user_repository import SQLAlchemyUserRepository
 from app.services.auth_service import UserForAuth, UserRepository
+from app.services.email_verification_service import EmailVerificationTokenRepository
 from app.services.refresh_session_service import RefreshSessionRepository
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -30,6 +33,18 @@ async def get_refresh_session_repository(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> RefreshSessionRepository:
     return SQLAlchemyRefreshSessionRepository(session)
+
+
+async def get_email_verification_token_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> EmailVerificationTokenRepository:
+    return SQLAlchemyEmailVerificationTokenRepository(session)
+
+
+def get_email_sender(
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> EmailSender:
+    return build_email_sender(settings)
 
 
 async def get_current_user(

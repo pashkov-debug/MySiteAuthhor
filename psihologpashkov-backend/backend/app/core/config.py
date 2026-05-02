@@ -20,6 +20,18 @@ class Settings(BaseSettings):
     jwt_access_ttl_minutes: int = 15
     jwt_refresh_ttl_days: int = 30
 
+    email_verification_token_ttl_hours: int = 24
+    email_verification_link_base_url: str = "http://127.0.0.1:5500"
+
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str = "Psiholog Pashkov"
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+
     auth_refresh_cookie_name: str = "refresh_token"
     auth_refresh_cookie_domain: str | None = None
     auth_refresh_cookie_path: str = "/api/v1/auth"
@@ -55,6 +67,8 @@ class Settings(BaseSettings):
     @field_validator(
         "jwt_access_ttl_minutes",
         "jwt_refresh_ttl_days",
+        "email_verification_token_ttl_hours",
+        "smtp_port",
         "cache_default_ttl_seconds",
         "avatar_max_size_bytes",
     )
@@ -73,6 +87,32 @@ class Settings(BaseSettings):
         normalized = str(value).strip()
 
         return normalized or None
+
+    @field_validator(
+        "smtp_host",
+        "smtp_username",
+        "smtp_password",
+        "smtp_from_email",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = str(value).strip()
+
+        return normalized or None
+
+    @field_validator("email_verification_link_base_url", "smtp_from_name", mode="before")
+    @classmethod
+    def normalize_required_text(cls, value: str) -> str:
+        normalized = str(value).strip()
+
+        if not normalized:
+            raise ValueError("Value must not be empty")
+
+        return normalized
 
     @property
     def cors_origins_list(self) -> list[str]:
