@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -7,6 +8,7 @@ from app.core.jwt import decode_token
 from app.core.security import verify_password
 from app.schemas.auth import LoginRequest, RegisterRequest
 from app.services.auth_service import (
+    EmailNotVerifiedError,
     InactiveUserError,
     InvalidCredentialsError,
     UserAlreadyExistsError,
@@ -23,6 +25,7 @@ class FakeUser:
     password_hash: str
     is_active: bool = True
     full_name: str | None = None
+    email_verified_at: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -32,19 +35,43 @@ class FakeUserRepository:
     async def get_by_email(self, email: str) -> FakeUser | None:
         return self.users_by_email.get(email)
 
+    async def get_by_id(self, user_id: UUID) -> FakeUser | None:
+        for user in self.users_by_email.values():
+            if user.id == user_id:
+                return user
+
+        return None
+
     async def create_user(
         self,
         email: str,
         password_hash: str,
         full_name: str | None,
+        is_active: bool = True,
     ) -> FakeUser:
         user = FakeUser(
             id=uuid4(),
             email=email,
             password_hash=password_hash,
             full_name=full_name,
+            is_active=is_active,
         )
         self.users_by_email[email] = user
+
+        return user
+
+    async def mark_email_verified(
+        self,
+        user_id: UUID,
+        verified_at: datetime | None = None,
+    ) -> FakeUser | None:
+        user = await self.get_by_id(user_id)
+
+        if user is None:
+            return None
+
+        user.email_verified_at = verified_at or datetime.now(UTC)
+        user.is_active = True
 
         return user
 
@@ -60,6 +87,8 @@ async def test_register_user_creates_user_with_hashed_password() -> None:
     user = await register_user(request, repository)
 
     assert user.email == "user@example.com"
+    assert user.is_active is False
+    assert user.email_verified_at is None
     assert user.password_hash != "strong-password"
     assert verify_password("strong-password", user.password_hash)
 
@@ -79,7 +108,7 @@ async def test_authenticate_user_accepts_valid_credentials() -> None:
     register_request = RegisterRequest(email="user@example.com", password="strong-password")
     login_request = LoginRequest(email="user@example.com", password="strong-password")
 
-    created_user = await register_user(register_request, repository)
+    created_user = await register_user(register_request, repository, is_active=True)
     authenticated_user = await authenticate_user(login_request, repository)
 
     assert authenticated_user.id == created_user.id
@@ -90,9 +119,20 @@ async def test_authenticate_user_rejects_wrong_password() -> None:
     register_request = RegisterRequest(email="user@example.com", password="strong-password")
     login_request = LoginRequest(email="user@example.com", password="wrong-password")
 
-    await register_user(register_request, repository)
+    await register_user(register_request, repository, is_active=True)
 
     with pytest.raises(InvalidCredentialsError):
+        await authenticate_user(login_request, repository)
+
+
+async def test_authenticate_user_rejects_unverified_email() -> None:
+    repository = FakeUserRepository()
+    register_request = RegisterRequest(email="user@example.com", password="strong-password")
+    login_request = LoginRequest(email="user@example.com", password="strong-password")
+
+    await register_user(register_request, repository)
+
+    with pytest.raises(EmailNotVerifiedError):
         await authenticate_user(login_request, repository)
 
 
@@ -101,7 +141,8 @@ async def test_authenticate_user_rejects_inactive_user() -> None:
     register_request = RegisterRequest(email="user@example.com", password="strong-password")
     login_request = LoginRequest(email="user@example.com", password="strong-password")
 
-    user = await register_user(register_request, repository)
+    user = await register_user(register_request, repository, is_active=True)
+    user.email_verified_at = datetime.now(UTC)
     user.is_active = False
 
     with pytest.raises(InactiveUserError):

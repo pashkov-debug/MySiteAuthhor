@@ -1,20 +1,30 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import get_app_settings, get_refresh_session_repository, get_user_repository
+from app.api.deps import (
+    get_app_settings,
+    get_email_sender,
+    get_email_verification_token_repository,
+    get_refresh_session_repository,
+    get_user_repository,
+)
 from app.core.config import Settings
+from app.core.email import EmailDeliveryError, EmailSender
 from app.core.cookies import clear_refresh_token_cookie, set_refresh_token_cookie
 from app.schemas.auth import (
+    EmailVerificationResendRequest,
+    EmailVerificationResponse,
     LoginRequest,
     LogoutResponse,
     RefreshTokenRequest,
     RegisterRequest,
+    RegisterResponse,
     TokenPairResponse,
 )
-from app.schemas.user import UserPublic
 from app.services.auth_service import (
+    EmailNotVerifiedError,
     InactiveUserError,
     InvalidCredentialsError,
     UserAlreadyExistsError,
@@ -22,6 +32,15 @@ from app.services.auth_service import (
     authenticate_user,
     create_token_pair,
     register_user,
+)
+from app.services.email_verification_service import (
+    EmailAlreadyVerifiedError,
+    EmailVerificationTokenRepository,
+    ExpiredEmailVerificationTokenError,
+    InvalidEmailVerificationTokenError,
+    create_email_verification_token,
+    send_registration_verification_email,
+    verify_email_by_token,
 )
 from app.services.refresh_session_service import (
     InvalidRefreshSessionError,
@@ -37,20 +56,116 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post(
     "/register",
-    response_model=UserPublic,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def register(
     data: RegisterRequest,
     user_repository: Annotated[UserRepository, Depends(get_user_repository)],
-) -> object:
+    verification_token_repository: Annotated[
+        EmailVerificationTokenRepository,
+        Depends(get_email_verification_token_repository),
+    ],
+    email_sender: Annotated[EmailSender, Depends(get_email_sender)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> RegisterResponse:
     try:
-        return await register_user(data, user_repository)
+        user = await register_user(data, user_repository, is_active=False)
     except (UserAlreadyExistsError, IntegrityError) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User already exists",
         ) from exc
+
+    verification_token = await create_email_verification_token(
+        user=user,
+        token_repository=verification_token_repository,
+        settings=settings,
+    )
+
+    try:
+        await send_registration_verification_email(
+            user=user,
+            raw_token=verification_token.raw_token,
+            email_sender=email_sender,
+            settings=settings,
+        )
+    except EmailDeliveryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email delivery failed",
+        ) from exc
+
+    return RegisterResponse(email=user.email, full_name=user.full_name)
+
+
+@router.post("/resend-verification", response_model=EmailVerificationResponse)
+async def resend_verification_email(
+    data: EmailVerificationResendRequest,
+    user_repository: Annotated[UserRepository, Depends(get_user_repository)],
+    verification_token_repository: Annotated[
+        EmailVerificationTokenRepository,
+        Depends(get_email_verification_token_repository),
+    ],
+    email_sender: Annotated[EmailSender, Depends(get_email_sender)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> EmailVerificationResponse:
+    user = await user_repository.get_by_email(data.email)
+
+    if user is None or (getattr(user, "email_verified_at", None) is not None and user.is_active):
+        return EmailVerificationResponse()
+
+    verification_token = await create_email_verification_token(
+        user=user,
+        token_repository=verification_token_repository,
+        settings=settings,
+    )
+
+    try:
+        await send_registration_verification_email(
+            user=user,
+            raw_token=verification_token.raw_token,
+            email_sender=email_sender,
+            settings=settings,
+        )
+    except EmailDeliveryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email delivery failed",
+        ) from exc
+
+    return EmailVerificationResponse()
+
+
+@router.get("/verify-email", response_model=EmailVerificationResponse)
+async def verify_email(
+    token: Annotated[str, Query(min_length=1)],
+    user_repository: Annotated[UserRepository, Depends(get_user_repository)],
+    verification_token_repository: Annotated[
+        EmailVerificationTokenRepository,
+        Depends(get_email_verification_token_repository),
+    ],
+) -> EmailVerificationResponse:
+    try:
+        await verify_email_by_token(
+            raw_token=token,
+            token_repository=verification_token_repository,
+            user_repository=user_repository,
+        )
+    except EmailAlreadyVerifiedError:
+        return EmailVerificationResponse()
+    except ExpiredEmailVerificationTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Email verification token expired",
+        ) from exc
+    except InvalidEmailVerificationTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email verification token",
+        ) from exc
+
+    return EmailVerificationResponse()
 
 
 @router.post("/login", response_model=TokenPairResponse)
@@ -71,6 +186,11 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
+        ) from exc
+    except EmailNotVerifiedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email is not verified",
         ) from exc
     except InactiveUserError as exc:
         raise HTTPException(

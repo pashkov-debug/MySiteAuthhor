@@ -1,15 +1,10 @@
-Раф
+## Препуш
 ruff check backend --fix
 ruff format backend
 ruff check backend
 pytest
 
-
-
-
 ## Локальный запуск
-
-ssh -i /home/alex/Downloads/id_rsa user1@89.232.176.127
 
 Быстрый безопасный сброс локального окружения
 
@@ -68,84 +63,105 @@ docker compose -f infra/compose.full.local.yml exec api alembic upgrade head
 ```bash
 cd psihologpashkov-backend
 source ../.venv/bin/activate
-
+```
+```
 make install
 make check
 make run
-
+```
 http://127.0.0.1:8000/
 http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/api/v1/healthz
 
 Docker local stack
+```
 make docker-up
 docker compose -f infra/compose.full.local.yml exec api alembic upgrade head
 curl -i http://127.0.0.1:8000/api/v1/healthz
-
-играции
+```
+Миграции
 
 История:
 
 alembic history
 
 Создать миграцию:
-
+```
 alembic revision --autogenerate -m "migration name"
-
+```
 Применить:
-
+```
 alembic upgrade head
-
+```
 Откатить последнюю:
-
+```
 alembic downgrade -1
+```
 Проверки
+```
 make format
 make check
-
+```
 Запуск апи
+```
 python -m uvicorn app.main:app --reload --app-dir backend
-
+```
 Алембик
+```
 alembic history
 alembic history --verbose
-
+```
 Посмотреть текущую применённую миграцию в БД (запустить бд вначале)
+```
 alembic current
-
+```
 Посмотреть последнюю доступную миграцию в коде
+```
 alembic heads
-
+```
 
 Применить все миграции до последней
+```
 alembic upgrade head
-
+```
 Откатить последнюю миграцию
+```
 alembic downgrade -1
-
+```
 Применить конкретную миграцию
+```
 alembic upgrade 20260428_0001
+```
 
 Проверить SQL, который будет выполнен, без применения
+```
 alembic upgrade head --sql
-
+```
 Сохранить в файл:
+```
 alembic upgrade head --sql > migration.sql
+```
 
 ДОКЕР:
 запуск бд
+```
 docker compose -f infra/compose.local.yml up -d postgres
+```
 проверка
+```
 docker compose -f infra/compose.local.yml ps
-
 alembic upgrade head
 alembic current
-
+```
 остановить бд
+```
 docker compose -f infra/compose.local.yml down
+```
 
 удалить локальную бд и стоп:
+```
 docker compose -f infra/compose.local.yml down -v
+```
 
 Пользователь
   ↓

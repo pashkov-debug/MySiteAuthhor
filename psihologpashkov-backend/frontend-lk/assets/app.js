@@ -181,15 +181,8 @@
         }
       });
 
-      const tokenPair = await apiRequest("/auth/login", {
-        method: "POST",
-        body: { email, password }
-      });
-
-      accessToken = tokenPair.access_token;
-      await loadCurrentUser();
       elements.registerForm.reset();
-      showMessage("Аккаунт создан.");
+      showMessage("Аккаунт создан. Проверьте почту и подтвердите email.");
     } catch (error) {
       showMessage(getErrorMessage(error), true);
     }
@@ -298,8 +291,38 @@
     showMessage("Вы вышли из личного кабинета.");
   }
 
+  async function confirmEmailFromUrl() {
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get("token");
+
+    if (!token) {
+      return false;
+    }
+
+    try {
+      await apiRequest(`/auth/verify-email?token=${encodeURIComponent(token)}`, {
+        method: "GET",
+        retry: false
+      });
+
+      url.searchParams.delete("token");
+      window.history.replaceState({}, document.title, url.toString());
+      showMessage("Email подтверждён. Теперь можно войти.");
+      return true;
+    } catch (error) {
+      showMessage(getErrorMessage(error), true);
+      return true;
+    }
+  }
+
   async function bootstrap() {
     setAuthenticatedView(false);
+
+    const emailConfirmed = await confirmEmailFromUrl();
+
+    if (emailConfirmed) {
+      return;
+    }
 
     const refreshed = await refreshAccessToken();
 

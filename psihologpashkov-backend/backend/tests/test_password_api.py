@@ -18,6 +18,7 @@ class FakeUser:
     full_name: str | None
     is_active: bool = True
     is_superuser: bool = False
+    email_verified_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -37,14 +38,32 @@ class FakeUserRepository:
         email: str,
         password_hash: str,
         full_name: str | None,
+        is_active: bool = True,
     ) -> FakeUser:
         user = FakeUser(
             id=uuid4(),
             email=email,
             password_hash=password_hash,
             full_name=full_name,
+            is_active=is_active,
         )
         self.users_by_id[user.id] = user
+
+        return user
+
+    async def mark_email_verified(
+        self,
+        user_id: UUID,
+        verified_at: datetime | None = None,
+    ) -> FakeUser | None:
+        user = self.users_by_id.get(user_id)
+
+        if user is None:
+            return None
+
+        user.email_verified_at = verified_at or datetime.now(UTC)
+        user.is_active = True
+        user.updated_at = datetime.now(UTC)
 
         return user
 
